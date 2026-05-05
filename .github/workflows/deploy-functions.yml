@@ -25,7 +25,7 @@ jobs:
       - name: Zip function app
         run: |
           cd mediahub-functions
-          zip -r ../mediahub-fn2.zip . \
+          zip -r mediahub-fn2.zip . \
             --exclude "*.pyc" \
             --exclude "__pycache__/*" \
             --exclude ".venv/*" \
@@ -37,6 +37,6 @@ jobs:
             "https://mediahub-fn2.scm.azurewebsites.net/api/zipdeploy" \
             -u "${{ secrets.AZURE_KUDU_USER }}:${{ secrets.AZURE_KUDU_PASS }}" \
             -H "Content-Type: application/zip" \
-            --data-binary @../mediahub-fn2.zip \
+            --data-binary @mediahub-functions/mediahub-fn2.zip \
             --fail \
             -v
