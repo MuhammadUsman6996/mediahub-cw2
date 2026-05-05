@@ -1,0 +1,231 @@
+/* MediaHub - shared styles */
+:root {
+  --bg:        #0e1116;
+  --surface:   #1a1f2a;
+  --surface-2: #232a38;
+  --border:    #2d3543;
+  --text:      #e6ebf2;
+  --text-dim:  #8a93a3;
+  --primary:   #5b8def;
+  --primary-2: #4670d6;
+  --danger:    #e25555;
+  --success:   #4ec47a;
+  --warn:      #e0a14b;
+  --radius:    10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ----- Header ------------------------------------------------ */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+header .brand {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text);
+}
+header nav { display: flex; gap: 18px; flex: 1; }
+header nav a { color: var(--text-dim); font-weight: 500; }
+header nav a.active { color: var(--text); }
+
+/* ----- Layout ------------------------------------------------ */
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+h1 { font-size: 24px; margin: 0 0 4px; }
+.subtitle { color: var(--text-dim); margin: 0 0 24px; }
+
+/* ----- Buttons ----------------------------------------------- */
+.btn {
+  display: inline-block;
+  padding: 9px 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 14px;
+}
+.btn:hover { background: var(--primary-2); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.btn.secondary:hover { background: #2d3543; }
+.btn.danger { background: var(--danger); }
+.btn.danger:hover { background: #c14545; }
+
+/* ----- Forms ------------------------------------------------- */
+label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+input[type=text], input[type=file], select, textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+input[type=text]:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* ----- Browse grid ------------------------------------------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.card:hover { transform: translateY(-2px); border-color: var(--primary); }
+.card .thumb {
+  width: 100%;
+  height: 140px;
+  background: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+}
+.card .meta { padding: 12px; }
+.card .title {
+  font-weight: 500;
+  font-size: 14px;
+  margin: 0 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card .sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ----- Status pills ------------------------------------------ */
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.pill.pending  { background: rgba(224, 161, 75, 0.18); color: var(--warn); }
+.pill.approved { background: rgba(78, 196, 122, 0.18); color: var(--success); }
+.pill.rejected { background: rgba(226, 85, 85, 0.18); color: var(--danger); }
+.pill.removed  { background: rgba(138, 147, 163, 0.18); color: var(--text-dim); }
+
+/* ----- Detail page ------------------------------------------- */
+.detail {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+}
+.detail .player {
+  background: #000;
+  border-radius: var(--radius);
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.detail .player img,
+.detail .player video {
+  max-width: 100%;
+  max-height: 100%;
+}
+.detail .info {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.detail .info h2 { margin: 0 0 6px; font-size: 18px; }
+.detail .info .row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.detail .info .row:last-child { border-bottom: none; }
+.detail .info .row span:first-child { color: var(--text-dim); }
+.detail .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ----- Upload progress --------------------------------------- */
+.upload-status {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 16px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 13px;
+}
+.upload-status .step {
+  padding: 4px 0;
+  color: var(--text-dim);
+}
+.upload-status .step.active { color: var(--primary); }
+.upload-status .step.done   { color: var(--success); }
+.upload-status .step.error  { color: var(--danger); }
+
+/* ----- Empty state ------------------------------------------- */
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-dim);
+}
+
+/* ----- Responsive -------------------------------------------- */
+@media (max-width: 700px) {
+  .detail { grid-template-columns: 1fr; }
+  header { flex-wrap: wrap; }
+}

@@ -1,0 +1,159 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": { "type": "Object", "defaultValue": {} }
+    },
+    "triggers": {
+      "When_HTTP_POST_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "POST",
+          "schema": {
+            "type": "object",
+            "required": [ "ownerId", "title", "fileExtension" ],
+            "properties": {
+              "ownerId":       { "type": "string", "format": "uuid" },
+              "title":         { "type": "string" },
+              "fileExtension": { "type": "string" },
+              "visibility":    { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "actions": {
+      "Init_mediaId": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "mediaId", "type": "string", "value": "@guid()" }
+          ]
+        },
+        "runAfter": {}
+      },
+
+      "Init_visibility": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "visibility", "type": "string",
+              "value": "@coalesce(triggerBody()?['visibility'], 'public')" }
+          ]
+        },
+        "runAfter": { "Init_mediaId": [ "Succeeded" ] }
+      },
+
+      "Init_blobName": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "blobName", "type": "string",
+              "value": "@{concat(variables('mediaId'), '.', triggerBody()?['fileExtension'])}" }
+          ]
+        },
+        "runAfter": { "Init_visibility": [ "Succeeded" ] }
+      },
+
+      "Init_blobUrl": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "blobUrl", "type": "string",
+              "value": "@{concat('https://<mediahubstorage1>.blob.core.windows.net/media/', variables('blobName'))}" }
+          ]
+        },
+        "runAfter": { "Init_blobName": [ "Succeeded" ] }
+      },
+
+      "Insert_into_MediaItems": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['sql']['connectionId']" } },
+          "method": "post",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default,default'))}/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[MediaItems]'))}/items",
+          "body": {
+            "mediaId":    "@variables('mediaId')",
+            "ownerId":    "@triggerBody()?['ownerId']",
+            "title":      "@triggerBody()?['title']",
+            "blobUrl":    "@variables('blobUrl')",
+            "visibility": "@variables('visibility')",
+            "status":     "pending"
+          }
+        },
+        "runAfter": { "Init_blobUrl": [ "Succeeded" ] }
+      },
+
+      "Create_Cosmos_metadata_doc": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['documentdb']['connectionId']" } },
+          "method": "post",
+          "path": "/dbs/@{encodeURIComponent('mediahub')}/colls/@{encodeURIComponent('MediaMetadata')}/docs",
+          "headers": {
+            "x-ms-documentdb-partitionkey": "[\"@{variables('mediaId')}\"]"
+          },
+          "body": {
+            "id":       "@variables('mediaId')",
+            "mediaId":  "@variables('mediaId')",
+            "ownerId":  "@triggerBody()?['ownerId']",
+            "tags":     [],
+            "aiLabels": [],
+            "stats":    { "views": 0, "likes": 0 },
+            "safety":   { "status": "pending", "score": null }
+          }
+        },
+        "runAfter": { "Insert_into_MediaItems": [ "Succeeded" ] }
+      },
+
+      "Generate_SAS_upload_URL": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['azureblob']['connectionId']" } },
+          "method": "post",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/CreateSharedLinkUriByPath",
+          "queries": {
+            "path": "@{concat('/media/', variables('blobName'))}",
+            "permissions": "Write",
+            "expiryTime": "@{addMinutes(utcNow(), 15)}"
+          }
+        },
+        "runAfter": { "Create_Cosmos_metadata_doc": [ "Succeeded" ] }
+      },
+
+      "Response_201_Created": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 201,
+          "headers": { "Content-Type": "application/json" },
+          "body": {
+            "mediaId":    "@variables('mediaId')",
+            "blobUrl":    "@variables('blobUrl')",
+            "uploadUrl":  "@body('Generate_SAS_upload_URL')?['WebUrl']",
+            "expiresIn":  "15 minutes",
+            "status":     "pending"
+          }
+        },
+        "runAfter": { "Generate_SAS_upload_URL": [ "Succeeded" ] }
+      },
+
+      "On_failure_response_500": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 500,
+          "body": { "error": "Create media failed", "runId": "@workflow().run.name" }
+        },
+        "runAfter": {
+          "Insert_into_MediaItems":      [ "Failed", "Skipped", "TimedOut" ],
+          "Create_Cosmos_metadata_doc":  [ "Failed", "Skipped", "TimedOut" ],
+          "Generate_SAS_upload_URL":     [ "Failed", "Skipped", "TimedOut" ]
+        }
+      }
+    },
+    "outputs": {}
+  }
+}

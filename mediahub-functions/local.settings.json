@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "<storage connection string>",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "BLOB_CONNECTION":          "<storage connection string>",
+    "VISION_ENDPOINT":          "https://<your-vision>.cognitiveservices.azure.com/",
+    "VISION_KEY":               "<key>",
+    "SAFETY_ENDPOINT":          "https://<your-safety>.cognitiveservices.azure.com/",
+    "SAFETY_KEY":               "<key>",
+    "COSMOS_ENDPOINT":          "https://<your-cosmos>.documents.azure.com:443/",
+    "COSMOS_KEY":               "<key>",
+    "COSMOS_DB":                "mediahub",
+    "COSMOS_CONTAINER":         "MediaMetadata",
+    "SQL_CONN":                 "Driver={ODBC Driver 18 for SQL Server};Server=tcp:<server>.database.windows.net,1433;Database=<db>;Uid=<user>;Pwd=<password>;Encrypt=yes;"
+  }
+}

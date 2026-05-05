@@ -1,0 +1,8 @@
+azure-functions
+azure-storage-blob
+azure-identity
+azure-ai-vision-imageanalysis
+azure-ai-contentsafety
+azure-cosmos
+pyodbc
+Pillow

@@ -1,0 +1,118 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": { "type": "Object", "defaultValue": {} }
+    },
+    "triggers": {
+      "When_HTTP_GET_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "GET",
+          "relativePath": "/media/{mediaId}"
+        }
+      }
+    },
+    "actions": {
+      "Init_mediaId": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "mediaId", "type": "string",
+              "value": "@coalesce(triggerOutputs()?['relativePathParameters']?['mediaId'], '')" }
+          ]
+        },
+        "runAfter": {}
+      },
+
+      "Branch_on_path": {
+        "type": "Switch",
+        "expression": "@if(equals(variables('mediaId'), ''), 'list', 'one')",
+        "cases": {
+
+          "list_all": {
+            "case": "list",
+            "actions": {
+              "Get_all_MediaItems": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": { "connection": { "name": "@parameters('$connections')['sql']['connectionId']" } },
+                  "method": "get",
+                  "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default,default'))}/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[MediaItems]'))}/items",
+                  "queries": {
+                    "$top": 50,
+                    "$orderby": "createdAt desc",
+                    "$filter": "status ne 'removed'"
+                  }
+                }
+              },
+              "Response_list": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                  "statusCode": 200,
+                  "headers": { "Content-Type": "application/json" },
+                  "body": "@body('Get_all_MediaItems')?['value']"
+                },
+                "runAfter": { "Get_all_MediaItems": [ "Succeeded" ] }
+              }
+            }
+          },
+
+          "one_by_id": {
+            "case": "one",
+            "actions": {
+              "Get_one_MediaItem": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": { "connection": { "name": "@parameters('$connections')['sql']['connectionId']" } },
+                  "method": "get",
+                  "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default,default'))}/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[MediaItems]'))}/items/@{encodeURIComponent(variables('mediaId'))}"
+                }
+              },
+              "Get_Cosmos_metadata": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": { "connection": { "name": "@parameters('$connections')['documentdb']['connectionId']" } },
+                  "method": "get",
+                  "path": "/dbs/@{encodeURIComponent('mediahub')}/colls/@{encodeURIComponent('MediaMetadata')}/docs/@{encodeURIComponent(variables('mediaId'))}",
+                  "headers": {
+                    "x-ms-documentdb-partitionkey": "[\"@{variables('mediaId')}\"]"
+                  }
+                },
+                "runAfter": { "Get_one_MediaItem": [ "Succeeded" ] }
+              },
+              "Response_one": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                  "statusCode": 200,
+                  "headers": { "Content-Type": "application/json" },
+                  "body": {
+                    "mediaItem": "@body('Get_one_MediaItem')",
+                    "metadata":  "@body('Get_Cosmos_metadata')"
+                  }
+                },
+                "runAfter": { "Get_Cosmos_metadata": [ "Succeeded", "Failed" ] }
+              },
+              "Response_404_if_not_found": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                  "statusCode": 404,
+                  "body": { "error": "Media not found", "mediaId": "@variables('mediaId')" }
+                },
+                "runAfter": { "Get_one_MediaItem": [ "Failed" ] }
+              }
+            }
+          }
+        },
+        "default": { "actions": {} },
+        "runAfter": { "Init_mediaId": [ "Succeeded" ] }
+      }
+    },
+    "outputs": {}
+  }
+}

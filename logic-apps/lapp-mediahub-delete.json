@@ -1,0 +1,127 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": { "type": "Object", "defaultValue": {} }
+    },
+    "triggers": {
+      "When_HTTP_DELETE_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "DELETE",
+          "relativePath": "/media/{mediaId}"
+        }
+      }
+    },
+    "actions": {
+      "Init_mediaId": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "mediaId", "type": "string",
+              "value": "@triggerOutputs()?['relativePathParameters']?['mediaId']" }
+          ]
+        },
+        "runAfter": {}
+      },
+
+      "Get_existing_MediaItem": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['sql']['connectionId']" } },
+          "method": "get",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default,default'))}/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[MediaItems]'))}/items/@{encodeURIComponent(variables('mediaId'))}"
+        },
+        "runAfter": { "Init_mediaId": [ "Succeeded" ] }
+      },
+
+      "Response_404_if_missing": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 404,
+          "body": { "error": "Media not found", "mediaId": "@variables('mediaId')" }
+        },
+        "runAfter": { "Get_existing_MediaItem": [ "Failed" ] }
+      },
+
+      "Init_blobName": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "blobName", "type": "string",
+              "value": "@last(split(body('Get_existing_MediaItem')?['blobUrl'], '/'))" }
+          ]
+        },
+        "runAfter": { "Get_existing_MediaItem": [ "Succeeded" ] }
+      },
+
+      "Delete_media_blob": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['azureblob']['connectionId']" } },
+          "method": "delete",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/files/@{encodeURIComponent(encodeURIComponent(concat('/media/', variables('blobName'))))}"
+        },
+        "runAfter": { "Init_blobName": [ "Succeeded" ] }
+      },
+
+      "Delete_thumbnail_blob": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['azureblob']['connectionId']" } },
+          "method": "delete",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/files/@{encodeURIComponent(encodeURIComponent(concat('/thumbs/', variables('mediaId'), '.jpg')))}"
+        },
+        "runAfter": { "Delete_media_blob": [ "Succeeded", "Failed" ] }
+      },
+
+      "Delete_Cosmos_doc": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['documentdb']['connectionId']" } },
+          "method": "delete",
+          "path": "/dbs/@{encodeURIComponent('mediahub')}/colls/@{encodeURIComponent('MediaMetadata')}/docs/@{encodeURIComponent(variables('mediaId'))}",
+          "headers": {
+            "x-ms-documentdb-partitionkey": "[\"@{variables('mediaId')}\"]"
+          }
+        },
+        "runAfter": { "Delete_thumbnail_blob": [ "Succeeded", "Failed" ] }
+      },
+
+      "Delete_MediaItems_row": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['sql']['connectionId']" } },
+          "method": "delete",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default,default'))}/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[MediaItems]'))}/items/@{encodeURIComponent(variables('mediaId'))}"
+        },
+        "runAfter": { "Delete_Cosmos_doc": [ "Succeeded", "Failed" ] }
+      },
+
+      "Response_204_NoContent": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 204
+        },
+        "runAfter": { "Delete_MediaItems_row": [ "Succeeded" ] }
+      },
+
+      "On_failure_response_500": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 500,
+          "body": { "error": "Delete failed", "runId": "@workflow().run.name" }
+        },
+        "runAfter": {
+          "Delete_MediaItems_row": [ "Failed", "TimedOut" ]
+        }
+      }
+    },
+    "outputs": {}
+  }
+}

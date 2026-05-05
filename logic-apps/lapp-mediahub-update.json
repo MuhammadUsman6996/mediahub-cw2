@@ -1,0 +1,136 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": { "type": "Object", "defaultValue": {} }
+    },
+    "triggers": {
+      "When_HTTP_PUT_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "PUT",
+          "relativePath": "/media/{mediaId}",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "title":      { "type": "string" },
+              "visibility": { "type": "string" },
+              "tags":       { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "actions": {
+      "Init_mediaId": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "mediaId", "type": "string",
+              "value": "@triggerOutputs()?['relativePathParameters']?['mediaId']" }
+          ]
+        },
+        "runAfter": {}
+      },
+
+      "Get_existing_MediaItem": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['sql']['connectionId']" } },
+          "method": "get",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default,default'))}/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[MediaItems]'))}/items/@{encodeURIComponent(variables('mediaId'))}"
+        },
+        "runAfter": { "Init_mediaId": [ "Succeeded" ] }
+      },
+
+      "Response_404_if_missing": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 404,
+          "body": { "error": "Media not found", "mediaId": "@variables('mediaId')" }
+        },
+        "runAfter": { "Get_existing_MediaItem": [ "Failed" ] }
+      },
+
+      "Update_MediaItems_row": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['sql']['connectionId']" } },
+          "method": "patch",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default,default'))}/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[MediaItems]'))}/items/@{encodeURIComponent(variables('mediaId'))}",
+          "body": {
+            "title":      "@coalesce(triggerBody()?['title'],      body('Get_existing_MediaItem')?['title'])",
+            "visibility": "@coalesce(triggerBody()?['visibility'], body('Get_existing_MediaItem')?['visibility'])"
+          }
+        },
+        "runAfter": { "Get_existing_MediaItem": [ "Succeeded" ] }
+      },
+
+      "Get_existing_Cosmos_doc": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['documentdb']['connectionId']" } },
+          "method": "get",
+          "path": "/dbs/@{encodeURIComponent('mediahub')}/colls/@{encodeURIComponent('MediaMetadata')}/docs/@{encodeURIComponent(variables('mediaId'))}",
+          "headers": {
+            "x-ms-documentdb-partitionkey": "[\"@{variables('mediaId')}\"]"
+          }
+        },
+        "runAfter": { "Update_MediaItems_row": [ "Succeeded" ] }
+      },
+
+      "Upsert_Cosmos_doc": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": { "connection": { "name": "@parameters('$connections')['documentdb']['connectionId']" } },
+          "method": "put",
+          "path": "/dbs/@{encodeURIComponent('mediahub')}/colls/@{encodeURIComponent('MediaMetadata')}/docs/@{encodeURIComponent(variables('mediaId'))}",
+          "headers": {
+            "x-ms-documentdb-partitionkey": "[\"@{variables('mediaId')}\"]"
+          },
+          "body": {
+            "id":       "@variables('mediaId')",
+            "mediaId":  "@variables('mediaId')",
+            "ownerId":  "@body('Get_existing_Cosmos_doc')?['ownerId']",
+            "tags":     "@coalesce(triggerBody()?['tags'], body('Get_existing_Cosmos_doc')?['tags'])",
+            "aiLabels": "@body('Get_existing_Cosmos_doc')?['aiLabels']",
+            "stats":    "@body('Get_existing_Cosmos_doc')?['stats']",
+            "safety":   "@body('Get_existing_Cosmos_doc')?['safety']"
+          }
+        },
+        "runAfter": { "Get_existing_Cosmos_doc": [ "Succeeded" ] }
+      },
+
+      "Response_200_OK": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "headers": { "Content-Type": "application/json" },
+          "body": {
+            "mediaId": "@variables('mediaId')",
+            "updated": true
+          }
+        },
+        "runAfter": { "Upsert_Cosmos_doc": [ "Succeeded" ] }
+      },
+
+      "On_failure_response_500": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 500,
+          "body": { "error": "Update failed", "runId": "@workflow().run.name" }
+        },
+        "runAfter": {
+          "Update_MediaItems_row": [ "Failed", "TimedOut" ],
+          "Upsert_Cosmos_doc":     [ "Failed", "TimedOut" ]
+        }
+      }
+    },
+    "outputs": {}
+  }
+}
