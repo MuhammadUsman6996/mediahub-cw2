@@ -73,3 +73,4 @@ in `requirements.txt` and adjust the connect call in
 
 - GitHub Actions CI/CD (auto-deploy Function App + SWA on push)
 - 5-min Panopto video script
+# MediaHub CW2
