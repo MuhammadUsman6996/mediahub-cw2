@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MediaHub - Detail</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">MediaHub</div>
+  <nav>
+    <a href="index.html">Browse</a>
+    <a href="upload.html">Upload</a>
+  </nav>
+</header>
+
+<main>
+  <div id="root">
+    <div class="empty"><p>Loading…</p></div>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+const mediaId = getQueryParam("id");
+const root = document.getElementById("root");
+
+if (!mediaId) {
+  root.innerHTML = '<div class="empty"><p>No media id in URL.</p></div>';
+} else {
+  load();
+}
+
+async function load() {
+  try {
+    const { mediaItem, metadata } = await api.getMedia(mediaId);
+    render(mediaItem, metadata || {});
+  } catch (err) {
+    root.innerHTML = `<div class="empty"><p style="color:var(--danger)">Failed to load: ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+function render(item, meta) {
+  const sas = "se=2026-12-31&sp=rl&sv=2026-02-06&sr=c&sig=HSWlaudSpchXk90zzvk2GuknJPZ49KJyJJopTq6xSdc%3D";
+  const mediaUrlWithSas = item.blobUrl ? item.blobUrl + "?" + sas : "";
+  const isVideo = /\.(mp4|webm|mov)$/i.test(item.blobUrl);
+  const playerHtml = isVideo
+    ? `<video controls src="${escapeHtml(mediaUrlWithSas)}"></video>`
+    : `<img src="${escapeHtml(mediaUrlWithSas)}" alt="${escapeHtml(item.title)}">`;
+
+  const labels = (meta.aiLabels || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("");
+  const tags   = (meta.tags     || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("");
+
+  root.innerHTML = `
+    <div class="detail">
+      <div>
+        <div class="player">${playerHtml}</div>
+        <h1 style="margin-top:16px" id="titleDisplay">${escapeHtml(item.title)}</h1>
+        <p class="subtitle">Uploaded ${new Date(item.createdAt).toLocaleString()}</p>
+
+        ${labels ? `<div><strong style="color:var(--text-dim);font-size:13px">Auto tags (AI Vision)</strong><div class="tags">${labels}</div></div>` : ""}
+        ${tags   ? `<div style="margin-top:12px"><strong style="color:var(--text-dim);font-size:13px">User tags</strong><div class="tags">${tags}</div></div>` : ""}
+      </div>
+
+      <aside class="info">
+        <h2>Details</h2>
+        <div class="row"><span>Status</span>${statusPill(item.status)}</div>
+        <div class="row"><span>Visibility</span><span>${escapeHtml(item.visibility)}</span></div>
+        <div class="row"><span>Owner</span><span style="font-family:monospace;font-size:11px">${escapeHtml(item.ownerId.slice(0,8))}…</span></div>
+        <div class="row"><span>Media ID</span><span style="font-family:monospace;font-size:11px">${escapeHtml(item.mediaId.slice(0,8))}…</span></div>
+
+        <div class="actions">
+          <button class="btn secondary" onclick="openEdit()">Edit</button>
+          <button class="btn danger" onclick="confirmDelete()">Delete</button>
+        </div>
+      </aside>
+    </div>
+
+    <dialog id="editDialog" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:20px;min-width:360px">
+      <h3 style="margin:0 0 12px">Edit media</h3>
+      <label>Title</label>
+      <input id="editTitle" type="text" value="${escapeHtml(item.title)}">
+      <label>Visibility</label>
+      <select id="editVis">
+        <option value="public"   ${item.visibility==='public'?'selected':''}>Public</option>
+        <option value="unlisted" ${item.visibility==='unlisted'?'selected':''}>Unlisted</option>
+        <option value="private"  ${item.visibility==='private'?'selected':''}>Private</option>
+      </select>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn secondary" onclick="document.getElementById('editDialog').close()">Cancel</button>
+        <button class="btn" onclick="saveEdit()">Save</button>
+      </div>
+    </dialog>
+  `;
+}
+
+function openEdit() {
+  document.getElementById("editDialog").showModal();
+}
+
+async function saveEdit() {
+  const title      = document.getElementById("editTitle").value.trim();
+  const visibility = document.getElementById("editVis").value;
+  try {
+    await api.updateMedia(mediaId, { title, visibility });
+    document.getElementById("editDialog").close();
+    load();
+  } catch (err) {
+    alert("Save failed: " + err.message);
+  }
+}
+
+async function confirmDelete() {
+  if (!confirm("Delete this media? This removes the file, thumbnail, SQL row and Cosmos doc. Cannot be undone.")) return;
+  try {
+    await api.deleteMedia(mediaId);
+    location.href = "index.html";
+  } catch (err) {
+    alert("Delete failed: " + err.message);
+  }
+}
+</script>
+</body>
+</html>
