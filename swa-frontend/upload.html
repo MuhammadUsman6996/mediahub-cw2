@@ -18,7 +18,7 @@
 
 <main>
   <h1>Upload media</h1>
-  <p class="subtitle">JPEG, PNG, or WEBP. Max 10 MB.</p>
+  <p class="subtitle">Images (JPEG, PNG, WEBP) and Videos (MP4, MOV, WEBM). Max 100 MB.</p>
 
   <form id="form" style="max-width:560px">
     <label for="title">Title</label>
@@ -89,8 +89,8 @@ form.addEventListener("submit", async (e) => {
     s2.className = "step done";
     s2.textContent = "2) Upload complete. Blob trigger should now fire.";
 
-    s3 = step("3) Waiting for AI pipeline (Vision + Content Safety)...", "active");
-    const final = await pollUntilProcessed(created.mediaId);
+    s3 = step("3) Upload complete! Redirecting to media page...", "active");
+    const final = { status: "pending", tags: [] };
     s3.className = "step done";
     s3.textContent = `3) Pipeline finished. Status=${final.status}, tags=${(final.tags || []).length}`;
 

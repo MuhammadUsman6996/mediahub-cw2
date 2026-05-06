@@ -44,10 +44,12 @@ async function load() {
 }
 
 function render(item, meta) {
+  const sas = "se=2026-12-31&sp=rl&sv=2026-02-06&sr=c&sig=HSWlaudSpchXk90zzvk2GuknJPZ49KJyJJopTq6xSdc%3D";
+  const mediaUrlWithSas = item.blobUrl ? item.blobUrl + "?" + sas : "";
   const isVideo = /\.(mp4|webm|mov)$/i.test(item.blobUrl);
   const playerHtml = isVideo
-    ? `<video controls src="${escapeHtml(item.blobUrl)}"></video>`
-    : `<img src="${escapeHtml(item.blobUrl)}" alt="${escapeHtml(item.title)}">`;
+    ? `<video controls src="${escapeHtml(mediaUrlWithSas)}"></video>`
+    : `<img src="${escapeHtml(mediaUrlWithSas)}" alt="${escapeHtml(item.title)}">`;
 
   const labels = (meta.aiLabels || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("");
   const tags   = (meta.tags     || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("");

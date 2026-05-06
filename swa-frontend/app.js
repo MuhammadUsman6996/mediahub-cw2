@@ -1,10 +1,6 @@
-// MediaHub API client - wraps the four Logic App endpoints
-// Used by browse.html, upload.html, detail.html
-
 const cfg = window.MEDIAHUB_CONFIG;
 
 const api = {
-  // POST /media -> { mediaId, blobUrl, uploadUrl, expiresIn, status }
   async createMedia({ ownerId, title, fileExtension, visibility }) {
     const r = await fetch(cfg.CREATE_URL, {
       method: "POST",
@@ -15,7 +11,6 @@ const api = {
     return r.json();
   },
 
-  // PUT a file directly to blob storage using the SAS upload URL
   async uploadFileToSas(uploadUrl, file) {
     const r = await fetch(uploadUrl, {
       method: "PUT",
@@ -24,27 +19,25 @@ const api = {
         "Content-Type": file.type || "application/octet-stream"
       },
       body: file
-    });
+    }); 
     if (!r.ok) throw new Error(`Upload failed: ${r.status}`);
   },
 
-  // GET /media -> array of MediaItems
   async listMedia() {
-    const r = await fetch(cfg.READ_URL + "/" + cfg.READ_URL_QUERY);
+    const r = await fetch(cfg.READ_LIST_URL);
     if (!r.ok) throw new Error(`List failed: ${r.status}`);
     return r.json();
   },
 
-  // GET /media/{id} -> { mediaItem, metadata }
   async getMedia(mediaId) {
-    const r = await fetch(cfg.READ_URL + "/" + encodeURIComponent(mediaId) + cfg.READ_URL_QUERY);
+    const url = cfg.READ_ONE_URL + "&mediaId=" + encodeURIComponent(mediaId);
+    const r = await fetch(url);
     if (!r.ok) throw new Error(`Get failed: ${r.status}`);
     return r.json();
   },
-
-  // PUT /media/{id}
   async updateMedia(mediaId, patch) {
-    const r = await fetch(cfg.UPDATE_URL + "/" + encodeURIComponent(mediaId) + cfg.UPDATE_URL_QUERY, {
+    const url = cfg.UPDATE_URL.replace("%7BmediaId%7D", encodeURIComponent(mediaId));
+    const r = await fetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch)
@@ -53,18 +46,16 @@ const api = {
     return r.json();
   },
 
-  // DELETE /media/{id}
   async deleteMedia(mediaId) {
-    const r = await fetch(cfg.DELETE_URL + "/" + encodeURIComponent(mediaId) + cfg.DELETE_URL_QUERY, {
-      method: "DELETE"
-    });
+    const url = cfg.DELETE_URL.replace("%7BmediaId%7D", encodeURIComponent(mediaId));
+    const r = await fetch(url, { method: "DELETE" });
     if (!r.ok && r.status !== 204) throw new Error(`Delete failed: ${r.status}`);
   }
 };
-
-// Helpers used by all pages
-function thumbUrl(mediaId) {
-  return `https://${cfg.STORAGE_ACCOUNT}.blob.core.windows.net/thumbs/${mediaId}.jpg`;
+function thumbUrl(mediaId, blobUrl) {
+  const sas = "se=2026-12-31&sp=rl&sv=2026-02-06&sr=c&sig=HSWlaudSpchXk90zzvk2GuknJPZ49KJyJJopTq6xSdc%3D";
+  if (blobUrl) return blobUrl + "?" + sas;
+  return "https://mediahubstorage1.blob.core.windows.net/media/" + mediaId + ".jpg?" + sas;
 }
 
 function statusPill(status) {

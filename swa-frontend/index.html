@@ -46,7 +46,9 @@
 
     grid.innerHTML = items.map(m => `
       <div class="card" onclick="location.href='detail.html?id=${encodeURIComponent(m.mediaId)}'">
-        <div class="thumb" style="background-image:url('${thumbUrl(m.mediaId)}')"></div>
+      <div class="thumb" style="${/\.(mp4|webm|mov)/i.test(m.blobUrl) ? '' : 'background-image:url(' + thumbUrl(m.mediaId, m.blobUrl) + ')'}">
+        ${/\.(mp4|webm|mov)/i.test(m.blobUrl) ? `<video src="${thumbUrl(m.mediaId, m.blobUrl)}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>` : ''}
+      </div>
         <div class="meta">
           <div class="title">${escapeHtml(m.title)}</div>
           <div class="sub">
